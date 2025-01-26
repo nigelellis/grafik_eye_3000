@@ -67,14 +67,14 @@ class GrafikEye(Thread):
                 raise ProcessorError("Login to processor failed!")
             #Get the system status on startup
             self.request_system_status()
-        except (BlockingIOError, ConnectionError, TiemoutError) as error:
+        except (BlockingIOError, ConnectionError, TimeoutError) as error:
             pass
             
     def _send(self, command):
         _LOGGER.debug(f"send: {command}")
         try:
             self._tc.write(command.encode('ascii') + b'\r\n')
-        except (ConnectionError, AtributeError):
+        except (ConnectionError, AttributeError):
             self._tc = None
             return False
 
