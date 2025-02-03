@@ -1,0 +1,6 @@
+{
+  "name": "Grafik Eye 3000",
+  "country": "ALL",
+  "domains": ["light", "scene"],
+  "homeassistant": "2024.2.1"
+}
