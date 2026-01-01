@@ -113,11 +113,34 @@ class GrafikEye(Thread):
         try:
             status_regex = re.compile(r":ss\s(.*)\n")
             error_regex = re.compile(r"~ERROR(.*)\n")
-            #For later implementation, if needed (i.e., DIP7 set to off)
-            #lbutton_press_regex = re.compile(r"[a-xA-X]\d\r\n")
-            #button_press = button_press_regex.findall(status)
+            button_press_regex = re.compile(r"([A-X])([0-9A-F])\r\n", re.IGNORECASE)
+
+            button_press = button_press_regex.findall(status)
             status_string = status_regex.findall(status)
             command_error = error_regex.findall(status)
+
+            # Handle button press events first (time-sensitive)
+            if button_press:
+                for press in button_press:
+                    unit_letter = press[0].upper()
+                    scene_char = press[1].upper()
+
+                    # Convert unit letter (A-X) to unit number (1-24)
+                    unit_number = str(ord(unit_letter) - ord('A') + 1)
+
+                    # Convert scene character to scene number using SCENES dict
+                    scene_number = SCENES.get(scene_char, None)
+
+                    if scene_number is not None:
+                        button_data = {
+                            'type': 'button_press',
+                            'unit': unit_number,
+                            'scene': scene_number
+                        }
+                        _LOGGER.debug(f"Button press detected: Unit {unit_number}, Scene {scene_number}")
+                        self._callback(button_data)
+
+            # Handle status updates (existing functionality)
             if status_string:
                 rawStatus = status_string[0]
                 #convert scenes A to G to number

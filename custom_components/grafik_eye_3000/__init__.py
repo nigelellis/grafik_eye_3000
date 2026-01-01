@@ -64,30 +64,65 @@ def setup(hass: HomeAssistant, base_config: ConfigType) -> bool:
     _LOGGER.info("GRX integration started!")
     
     def handle_grx_callback(status):
-        """Dispatch state changes."""
+        """Dispatch state changes and fire button press events."""
         _LOGGER.debug("callback: %s", status)
-        for key in status:
-            if status[key] == "M": #"M" means missing, so no unit at that address
-                continue
-            signal = f"grafik_eye_entity_{key}"
-            unit_status = status[key]
-            _LOGGER.debug("Broadcasting to signal %s value %s", signal, unit_status)
-            dispatcher_send(hass, signal, unit_status)
+
+        # Check if this is a button press event
+        if isinstance(status, dict) and status.get('type') == 'button_press':
+            unit = status['unit']
+            scene = status['scene']
+
+            # Build event data
+            event_data = {
+                'unit': unit,
+                'scene': scene,
+                'device_id': f"grafik_eye_unit_{unit}",
+            }
+
+            # Look up switch name from configuration if it exists
+            switch_name = switch_lookup.get((str(unit), str(scene)))
+            if switch_name:
+                event_data['name'] = switch_name
+
+            _LOGGER.info("Button press event: unit=%s, scene=%s, name=%s",
+                         unit, scene, switch_name or 'unconfigured')
+
+            hass.bus.fire(
+                event_type='grafik_eye_button_press',
+                event_data=event_data
+            )
+
+        # Otherwise, it's a status update (existing functionality)
+        else:
+            for key in status:
+                if status[key] == "M": #"M" means missing, so no unit at that address
+                    continue
+                signal = f"grafik_eye_entity_{key}"
+                unit_status = status[key]
+                _LOGGER.debug("Broadcasting to signal %s value %s", signal, unit_status)
+                dispatcher_send(hass, signal, unit_status)
     
     config = base_config.get(DOMAIN)
     host = config[CONF_HOST]
     port = config[CONF_PORT]
     user = config[CONF_USER]
+    switches = config[CONF_SWITCHES]
+
+    # Create lookup dictionary: (unit, scene) -> switch name
+    switch_lookup = {}
+    for switch in switches:
+        key = (switch[CONF_ADDR], switch[CONF_SCENE])
+        switch_lookup[key] = switch[CONF_NAME]
+
     _LOGGER.info(f"GRX telnet info: {host} {port} {user}")
     controller = GrafikEye(host, port, user, handle_grx_callback)
     hass.data[GRX_INTERFACE] = controller
-    
+
     def cleanup():
         controller.close()
-    
+
     hass.bus.listen_once(EVENT_HOMEASSISTANT_STOP, cleanup)
 
-    switches = config[CONF_SWITCHES]
     if switches:
         hass.create_task(
             async_load_platform(hass, "switch", DOMAIN, {CONF_SWITCHES: switches}, base_config)
