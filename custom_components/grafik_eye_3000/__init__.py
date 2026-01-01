@@ -7,6 +7,7 @@ from .pygrafikeye import GrafikEye
 
 #import asyncio
 import logging
+import time
 import voluptuous as vol
 
 from homeassistant.const import (
@@ -62,7 +63,11 @@ CONFIG_SCHEMA = vol.Schema(
 def setup(hass: HomeAssistant, base_config: ConfigType) -> bool:
     """ Start Grafik Eye communication. """
     _LOGGER.info("GRX integration started!")
-    
+
+    # Debounce tracking: key = (unit, scene), value = timestamp
+    last_button_press = {}
+    DEBOUNCE_WINDOW = 1.0  # seconds
+
     def handle_grx_callback(status):
         """Dispatch state changes and fire button press events."""
         _LOGGER.debug("callback: %s", status)
@@ -71,6 +76,24 @@ def setup(hass: HomeAssistant, base_config: ConfigType) -> bool:
         if isinstance(status, dict) and status.get('type') == 'button_press':
             unit = status['unit']
             scene = status['scene']
+            current_time = time.time()
+
+            # Check for duplicate within debounce window
+            button_key = (unit, scene)
+            last_time = last_button_press.get(button_key, 0)
+            time_since_last = current_time - last_time
+
+            if time_since_last < DEBOUNCE_WINDOW:
+                _LOGGER.debug("Debouncing duplicate button press: unit=%s, scene=%s (%.3fs since last)",
+                             unit, scene, time_since_last)
+                return  # Skip this duplicate event
+
+            # Update the timestamp for this button
+            last_button_press[button_key] = current_time
+
+            # Clean up old entries (older than 10 seconds) to prevent memory buildup
+            cleanup_threshold = current_time - 10.0
+            last_button_press.update({k: v for k, v in last_button_press.items() if v > cleanup_threshold})
 
             # Build event data
             event_data = {
