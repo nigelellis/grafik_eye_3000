@@ -4,6 +4,8 @@ Home Assistant Custom Component for Lutron Grafik Eye 3000
 This component communicates with Grafik Eye units through a GRX-CI-NWK-E Control Interface. 
 
 ## Configuration
+Ensure the GRX interface DIP switches 6 and 7 are 'on'.  This ensures status updates are echoed to the conenction.
+
 To use this component, you will need to add some code to your configuration.yaml.  The following is an example:
 
 ```yaml

@@ -5,15 +5,14 @@ Each Grafik Eye Unit can have 16 scenes and "off"
 
 from .pygrafikeye import GrafikEye
 
-#import asyncio
+# import asyncio
 import logging
-import time
 import voluptuous as vol
 
 from homeassistant.const import (
-    CONF_SWITCHES, 
-    CONF_NAME, 
-    CONF_HOST, 
+    CONF_SWITCHES,
+    CONF_NAME,
+    CONF_HOST,
     CONF_PORT,
     EVENT_HOMEASSISTANT_STOP,
 )
@@ -60,13 +59,10 @@ CONFIG_SCHEMA = vol.Schema(
     extra=vol.ALLOW_EXTRA,
 )
 
+
 def setup(hass: HomeAssistant, base_config: ConfigType) -> bool:
     """ Start Grafik Eye communication. """
     _LOGGER.info("GRX integration started!")
-
-    # Debounce tracking: key = (unit, scene), value = timestamp
-    last_button_press = {}
-    DEBOUNCE_WINDOW = 1.0  # seconds
 
     def handle_grx_callback(status):
         """Dispatch state changes and fire button press events."""
@@ -76,24 +72,6 @@ def setup(hass: HomeAssistant, base_config: ConfigType) -> bool:
         if isinstance(status, dict) and status.get('type') == 'button_press':
             unit = status['unit']
             scene = status['scene']
-            current_time = time.time()
-
-            # Check for duplicate within debounce window
-            button_key = (unit, scene)
-            last_time = last_button_press.get(button_key, 0)
-            time_since_last = current_time - last_time
-
-            if time_since_last < DEBOUNCE_WINDOW:
-                _LOGGER.debug("Debouncing duplicate button press: unit=%s, scene=%s (%.3fs since last)",
-                             unit, scene, time_since_last)
-                return  # Skip this duplicate event
-
-            # Update the timestamp for this button
-            last_button_press[button_key] = current_time
-
-            # Clean up old entries (older than 10 seconds) to prevent memory buildup
-            cleanup_threshold = current_time - 10.0
-            last_button_press.update({k: v for k, v in last_button_press.items() if v > cleanup_threshold})
 
             # Build event data
             event_data = {
@@ -118,13 +96,14 @@ def setup(hass: HomeAssistant, base_config: ConfigType) -> bool:
         # Otherwise, it's a status update (existing functionality)
         else:
             for key in status:
-                if status[key] == "M": #"M" means missing, so no unit at that address
+                if status[key] == "M":  # "M" means missing, so no unit at that address
                     continue
                 signal = f"grafik_eye_entity_{key}"
                 unit_status = status[key]
-                _LOGGER.debug("Broadcasting to signal %s value %s", signal, unit_status)
+                _LOGGER.debug("Broadcasting to signal %s value %s",
+                              signal, unit_status)
                 dispatcher_send(hass, signal, unit_status)
-    
+
     config = base_config.get(DOMAIN)
     host = config[CONF_HOST]
     port = config[CONF_PORT]
@@ -148,33 +127,34 @@ def setup(hass: HomeAssistant, base_config: ConfigType) -> bool:
 
     if switches:
         hass.create_task(
-            async_load_platform(hass, "switch", DOMAIN, {CONF_SWITCHES: switches}, base_config)
+            async_load_platform(hass, "switch", DOMAIN, {
+                                CONF_SWITCHES: switches}, base_config)
         )
-        
+
     return True
+
 
 class GrafikEyeDevice:
     """Base class of a Grafik Eye Device."""
-    
+
     def __init__(self, controller, unit, scene, name):
         """Initialize Grafik Eye device."""
         self._unit = unit
         self._name = name
         self._scene = scene
         self._controller = controller
-        
+
     @property
     def unique_id(self):
         return f"grafik_eye.{self._unit}{self._scene}"
-        
+
     @property
     def name(self):
         return self._name
-        
+
     @property
     def should_poll(self):
         """The GRX interface will push status if DIP switches 6 and 7
         are set to 'on'.  If not, polling will be required with
         request_system_status method."""
         return False
-    

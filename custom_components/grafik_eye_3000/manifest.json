@@ -1,10 +1,14 @@
 {
   "domain": "grafik_eye",
   "name": "Lutron Grafik Eye 3000",
-  "codeowners": ["@nigelellis"],
+  "codeowners": [
+    "@nigelellis"
+  ],
   "documentation": "https://github.com/nigelellis/grafik_eye_3000",
   "issue_tracker": "https://github.com/nigelellis/grafik_eye_3000/issues",
-  "loggers": ["grafik_eye"],
+  "loggers": [
+    "grafik_eye"
+  ],
   "requirements": [],
-  "version": "1.0.0"
+  "version": "1.0.1"
 }
