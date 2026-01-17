@@ -98,6 +98,8 @@ def setup(hass: HomeAssistant, base_config: ConfigType) -> bool:
             for key in status:
                 if status[key] == "M":  # "M" means missing, so no unit at that address
                     continue
+                if status[key] == "R":  # "R" means ramping (scene transition in progress)
+                    continue
                 signal = f"grafik_eye_entity_{key}"
                 unit_status = status[key]
                 _LOGGER.debug("Broadcasting to signal %s value %s",

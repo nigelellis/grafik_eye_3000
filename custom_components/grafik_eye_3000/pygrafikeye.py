@@ -23,7 +23,8 @@ POLLING_FREQ = 1.
 SCENES = {'0': 0, '1': 1,  '2': 2,  '3': 3,  '4': 4,
           '5': 5,  '6': 6,  '7': 7,  '8': 8,
                    '9': 9,  'A': 10, 'B': 11, 'C': 12,
-                   'D': 13, 'E': 14, 'F': 15, 'G': 16, 'M': 'M'}
+                   'D': 13, 'E': 14, 'F': 15, 'G': 16, 'M': 'M',
+                   'R': 'R'}  # R = Ramping (scene transition in progress)
 
 SCENES_REV = dict([(SCENES[x], x) for x in SCENES])
 
@@ -112,6 +113,15 @@ class GrafikEye(Thread):
     def _handle_response(self, status):
         _LOGGER.debug(f"Raw: {status}")
         try:
+            # Ignore empty/whitespace-only responses
+            if not status.strip():
+                return
+
+            # Ignore command acknowledgments (e.g., "~1 OK", "~2 OK")
+            if re.search(r"~\d+\s+OK", status):
+                _LOGGER.debug(f"Command acknowledged: {status.strip()}")
+                return
+
             status_regex = re.compile(r":ss\s(.*)\n")
             error_regex = re.compile(r"~ERROR(.*)\n")
 
@@ -121,6 +131,8 @@ class GrafikEye(Thread):
             button_press = button_press_regex.findall(status)
             status_string = status_regex.findall(status)
             command_error = error_regex.findall(status)
+
+            handled = False
 
             # Handle button press events first (time-sensitive)
             if button_press:
@@ -143,6 +155,7 @@ class GrafikEye(Thread):
                         _LOGGER.debug(
                             f"Button press detected: Unit {unit_number}, Scene {scene_number}")
                         self._callback(button_data)
+                        handled = True
 
             # Handle status updates (existing functionality)
             if status_string:
@@ -151,11 +164,11 @@ class GrafikEye(Thread):
                 pared_status = [SCENES[char] for char in (rawStatus[:8])]
                 current_status = dict(zip(unit_list, pared_status))
                 self._callback(current_status)
-                status_string = None
-            else:
+                handled = True
+
+            if not handled:
                 _LOGGER.warning(
                     f"Not handling: {status} Command Error: {command_error}")
-                pass
         except ValueError:
             _LOGGER.warning(f"Weird data: {status}")
 
